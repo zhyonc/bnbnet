@@ -24,6 +24,7 @@ type BufferManipulator interface {
 	Encrypt1(buf []byte, n int8) []byte
 	Encrypt2(buf []byte, n int16) []byte
 	Encrypt4(buf []byte, n int32) []byte
+	EncryptBuffer(buf []byte, newBuf []byte) []byte
 	Decode1(buf []byte) int8
 	Decode2(buf []byte) int16
 	Decode4(buf []byte) int32
@@ -31,6 +32,7 @@ type BufferManipulator interface {
 	Decrypt1(buf []byte) int8
 	Decrypt2(buf []byte) int16
 	Decrypt4(buf []byte) int32
+	DecryptBuffer(buf []byte, uSize int) []byte
 }
 
 type CRC interface {

@@ -91,15 +91,14 @@ func (cs *clientSocket) TryRead() {
 				cs.OnError(fmt.Errorf("client header code %d doesn't match server header code %d", clientHeaderCode, serverHeaderCode))
 				return
 			}
-			if gSetting.CipherDegree == enum.CipherDegree_None {
-				readSize = int(crypt.CBufferManipulator.Decode2(cs.rcvBuff[1:3]))
-			} else {
-				readSize = int(crypt.CBufferManipulator.Decrypt2(cs.rcvBuff[1:3]))
-			}
 			switch gSetting.CipherDegree {
-			case enum.CipherDegree_CRC8:
+			case enum.CipherDegree_None:
+				readSize = int(crypt.CBufferManipulator.Decode2(cs.rcvBuff[1:3]))
+			case enum.CipherDegree_CRC8, enum.CipherDegree_LH_CRC8:
+				readSize = int(crypt.CBufferManipulator.Decrypt2(cs.rcvBuff[1:3]))
 				readSize += 1
 			case enum.CipherDegree_CRC32:
+				readSize = int(crypt.CBufferManipulator.Decrypt2(cs.rcvBuff[1:3]))
 				readSize += 4
 			}
 		} else {
@@ -110,13 +109,8 @@ func (cs *clientSocket) TryRead() {
 				cs.OnError(fmt.Errorf("invaild crc value"))
 				return
 			}
-			if gSetting.CipherDegree == enum.CipherDegree_None {
-				cs.delegate.DebugRcvPacketLog(cs.id, rcvPacket)
-				cs.delegate.DispatchPacket(cs, rcvPacket)
-			} else {
-				cs.delegate.DispatchPacket(cs, rcvPacket)
-				cs.delegate.DebugRcvPacketLog(cs.id, rcvPacket)
-			}
+			cs.delegate.DebugRcvPacketLog(cs.id, rcvPacket)
+			cs.delegate.DispatchPacket(cs, rcvPacket)
 			cs.seqRcv += crypt.SEQ_RCV_DELTA
 			readSize = HEADER_LENGTH
 		}

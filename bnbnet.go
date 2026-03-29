@@ -35,6 +35,7 @@ type CSendPacket interface {
 	Encode2(n int16)
 	Encode4(n int32)
 	EncodeBuffer(newBuf []byte)
+	EncryptBuffer(newBuf []byte)
 	EncodeStr(s string)
 	DumpString(nSize int) string
 	MakePacketComplete(headerType uint8, seqSnd uint32) []byte
@@ -51,6 +52,7 @@ type CReceivedPacket interface {
 	Decode2() int16
 	Decode4() int32
 	DecodeBuffer(uSize int) []byte
+	DecryptBuffer(uSize int) []byte
 	DecodeStr() string
 	DecryptStr(key uint32) string
 	DumpString(nSize int) string

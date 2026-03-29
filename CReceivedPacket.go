@@ -12,7 +12,6 @@ type receivePacket struct {
 	Base     crypt.ReceivedPacketBase
 	Degree   enum.CipherDegree
 	RecvBuff []byte
-	LogBuff  []byte
 	Length   int
 	Offset   int
 }
@@ -21,7 +20,6 @@ func NewReceivedPacket(buf []byte) CReceivedPacket {
 	p := &receivePacket{
 		Base:     crypt.NewReceivedPacketBase(),
 		RecvBuff: buf,
-		LogBuff:  make([]byte, 0),
 	}
 	p.Degree = gSetting.CipherDegree
 	return p
@@ -75,7 +73,6 @@ func (p *receivePacket) Decode1() int8 {
 		result = crypt.CBufferManipulator.Decode1(p.RecvBuff[p.Offset : p.Offset+1])
 	} else {
 		result = crypt.CBufferManipulator.Decrypt1(p.RecvBuff[p.Offset : p.Offset+1])
-		p.LogBuff = crypt.CBufferManipulator.Encode1(p.LogBuff, result)
 	}
 	p.Offset += 1
 	return result
@@ -91,7 +88,6 @@ func (p *receivePacket) Decode2() int16 {
 		result = crypt.CBufferManipulator.Decode2(p.RecvBuff[p.Offset : p.Offset+2])
 	} else {
 		result = crypt.CBufferManipulator.Decrypt2(p.RecvBuff[p.Offset : p.Offset+2])
-		p.LogBuff = crypt.CBufferManipulator.Encode2(p.LogBuff, result)
 	}
 	p.Offset += 2
 	return int16(result)
@@ -107,7 +103,6 @@ func (p *receivePacket) Decode4() int32 {
 		result = crypt.CBufferManipulator.Decode4(p.RecvBuff[p.Offset : p.Offset+4])
 	} else {
 		result = crypt.CBufferManipulator.Decrypt4(p.RecvBuff[p.Offset : p.Offset+4])
-		p.LogBuff = crypt.CBufferManipulator.Encode4(p.LogBuff, result)
 	}
 	p.Offset += 4
 	return int32(result)
@@ -119,9 +114,16 @@ func (p *receivePacket) DecodeBuffer(uSize int) []byte {
 		return nil
 	}
 	result := crypt.CBufferManipulator.DecodeBuffer(p.RecvBuff[p.Offset:], uSize)
-	if p.Degree != enum.CipherDegree_None {
-		p.LogBuff = crypt.CBufferManipulator.EncodeBuffer(p.LogBuff, result)
+	p.Offset += uSize
+	return result
+}
+
+// DecryptBuffer implements [CReceivedPacket].
+func (p *receivePacket) DecryptBuffer(uSize int) []byte {
+	if p.GetRemain() < uSize || uSize < 0 {
+		return nil
 	}
+	result := crypt.CBufferManipulator.DecryptBuffer(p.RecvBuff[p.Offset:], uSize)
 	p.Offset += uSize
 	return result
 }
@@ -149,27 +151,19 @@ func (p *receivePacket) DecryptStr(key uint32) string {
 		return ""
 	}
 	encryptedBuf := p.DecodeBuffer(strLen)
-	// Username encryption key 287454020
-	// Password encryption key 1144201745
 	buf := crypt.SimpleStreamDecrypt(encryptedBuf, key)
 	return GetLangStr(buf)
 }
 
 // DumpString implements [CReceivedPacket].
 func (p *receivePacket) DumpString(nSize int) string {
-	var buf []byte
-	if p.Degree == enum.CipherDegree_None {
-		buf = p.RecvBuff
-	} else {
-		buf = p.LogBuff
-	}
-	bufLength := len(buf)
+	bufLength := len(p.RecvBuff)
 	if nSize <= 0 || nSize > bufLength {
 		nSize = bufLength
 	}
 	var builder strings.Builder
 	for i := range nSize {
-		v := buf[i]
+		v := p.RecvBuff[i]
 		fmt.Fprintf(&builder, "%02X", v)
 		if i < nSize-1 {
 			builder.WriteString(" ")

@@ -12,7 +12,6 @@ type sendPacket struct {
 	Base     crypt.SendPacketBase
 	Degree   enum.CipherDegree
 	SendBuff []byte
-	LogBuff  []byte
 	Offset   int
 }
 
@@ -20,7 +19,6 @@ func NewSendPacket(nType uint8) CSendPacket {
 	p := &sendPacket{
 		Base:     crypt.NewSendPacketBase(),
 		SendBuff: make([]byte, 0),
-		LogBuff:  make([]byte, 0),
 	}
 	if nType == 0 {
 		p.Degree = enum.CipherDegree_None
@@ -68,7 +66,6 @@ func (p *sendPacket) Encode1(n int8) {
 		p.SendBuff = crypt.CBufferManipulator.Encode1(p.SendBuff, n)
 	} else {
 		p.SendBuff = crypt.CBufferManipulator.Encrypt1(p.SendBuff, n)
-		p.LogBuff = crypt.CBufferManipulator.Encode1(p.LogBuff, n)
 	}
 	p.Offset++
 }
@@ -79,7 +76,6 @@ func (p *sendPacket) Encode2(n int16) {
 		p.SendBuff = crypt.CBufferManipulator.Encode2(p.SendBuff, n)
 	} else {
 		p.SendBuff = crypt.CBufferManipulator.Encrypt2(p.SendBuff, n)
-		p.LogBuff = crypt.CBufferManipulator.Encode2(p.LogBuff, n)
 	}
 	p.Offset += 2
 }
@@ -90,7 +86,6 @@ func (p *sendPacket) Encode4(n int32) {
 		p.SendBuff = crypt.CBufferManipulator.Encode4(p.SendBuff, n)
 	} else {
 		p.SendBuff = crypt.CBufferManipulator.Encrypt4(p.SendBuff, n)
-		p.LogBuff = crypt.CBufferManipulator.Encode4(p.LogBuff, n)
 	}
 	p.Offset += 4
 }
@@ -98,9 +93,12 @@ func (p *sendPacket) Encode4(n int32) {
 // EncodeBuffer implements [CSendPacket].
 func (p *sendPacket) EncodeBuffer(newBuf []byte) {
 	p.SendBuff = crypt.CBufferManipulator.EncodeBuffer(p.SendBuff, newBuf)
-	if p.Degree != enum.CipherDegree_None {
-		p.LogBuff = crypt.CBufferManipulator.EncodeBuffer(p.LogBuff, newBuf)
-	}
+	p.Offset += len(newBuf)
+}
+
+// EncryptBuffer implements [CSendPacket].
+func (p *sendPacket) EncryptBuffer(newBuf []byte) {
+	p.SendBuff = crypt.CBufferManipulator.EncryptBuffer(p.SendBuff, newBuf)
 	p.Offset += len(newBuf)
 }
 
@@ -114,19 +112,13 @@ func (p *sendPacket) EncodeStr(s string) {
 
 // DumpString implements [CSendPacket].
 func (p *sendPacket) DumpString(nSize int) string {
-	var buf []byte
-	if p.Degree == enum.CipherDegree_None {
-		buf = p.SendBuff
-	} else {
-		buf = p.LogBuff
-	}
-	bufLength := len(buf)
+	bufLength := len(p.SendBuff)
 	if nSize <= 0 || nSize > bufLength {
 		nSize = bufLength
 	}
 	var builder strings.Builder
 	for i := range nSize {
-		v := buf[i]
+		v := p.SendBuff[i]
 		fmt.Fprintf(&builder, "%02X", v)
 		if i < nSize-1 {
 			builder.WriteString(" ")

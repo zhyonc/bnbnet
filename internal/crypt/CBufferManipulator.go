@@ -57,6 +57,32 @@ func (bm *bufferManipulator) Encrypt4(buf []byte, n int32) []byte {
 	return bm.Encode4(buf, int32(v))
 }
 
+// EncryptBuffer implements [BufferManipulator].
+func (bm *bufferManipulator) EncryptBuffer(buf []byte, newBuf []byte) []byte {
+	buf = append(buf, newBuf...)
+	bufLen := len(buf)
+	i := 0
+	for i < bufLen {
+		rem := bufLen - i
+		switch {
+		case rem >= 4:
+			val := binary.LittleEndian.Uint32(buf[i:])
+			val ^= XOR_KEY4
+			binary.BigEndian.PutUint32(buf[i:], val)
+			i += 4
+		case rem >= 2:
+			val := binary.LittleEndian.Uint16(buf[i:])
+			val ^= XOR_KEY2
+			binary.BigEndian.PutUint16(buf[i:], val)
+			i += 2
+		default:
+			buf[i] ^= byte(XOR_KEY1)
+			i++
+		}
+	}
+	return buf
+}
+
 // Decode1 implements [BufferManipulator].
 func (bm *bufferManipulator) Decode1(buf []byte) int8 {
 	return int8(buf[0])
@@ -95,4 +121,29 @@ func (bm *bufferManipulator) Decrypt2(buf []byte) int16 {
 func (bm *bufferManipulator) Decrypt4(buf []byte) int32 {
 	result := bm.Decode4(buf)
 	return int32(uint32(result) ^ XOR_KEY4)
+}
+
+// DecryptBuffer implements [BufferManipulator].
+func (bm *bufferManipulator) DecryptBuffer(buf []byte, uSize int) []byte {
+	result := make([]byte, uSize)
+	i := 0
+	for i < uSize {
+		rem := uSize - i
+		switch {
+		case rem >= 4:
+			val := binary.BigEndian.Uint32(buf[i:])
+			val ^= XOR_KEY4
+			binary.LittleEndian.PutUint32(result[i:], val)
+			i += 4
+		case rem >= 2:
+			val := binary.BigEndian.Uint16(buf[i:])
+			val ^= XOR_KEY2
+			binary.LittleEndian.PutUint16(result[i:], val)
+			i += 2
+		default:
+			result[i] = buf[i] ^ byte(XOR_KEY1)
+			i++
+		}
+	}
+	return result
 }
